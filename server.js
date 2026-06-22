@@ -1,9 +1,15 @@
+// Load environment variables from .env as early as possible so every module
+// below (auth keys, port, host, etc.) sees them.
+require('dotenv').config();
+
 const path = require('path');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 
 const { requireConnection, closeAll } = require('./src/connectionManager');
+const auth = require('./src/utils/auth');
 
+const authRoutes = require('./src/routes/auth');
 const connectionRoutes = require('./src/routes/connection');
 const databaseRoutes = require('./src/routes/databases');
 const collectionRoutes = require('./src/routes/collections');
@@ -12,7 +18,22 @@ const indexRoutes = require('./src/routes/indexes');
 const userRoutes = require('./src/routes/users');
 const statsRoutes = require('./src/routes/stats');
 
+// Fail closed: refuse to start if the auth layer is not configured (e.g. the
+// APP_ACCESS_KEY is missing). This prevents accidentally exposing an open app.
+try {
+  auth.assertReady();
+} catch (err) {
+  console.error(`[MongoExplorer] Configuration error: ${err.message}`);
+  process.exit(1);
+}
+
 const app = express();
+
+// Honour X-Forwarded-* headers when behind a reverse proxy so client IPs are
+// detected correctly for login rate limiting.
+if (process.env.TRUST_PROXY) {
+  app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : process.env.TRUST_PROXY);
+}
 
 // Body + cookie parsing. The 5mb limit comfortably covers large documents.
 app.use(express.json({ limit: '5mb' }));
@@ -21,15 +42,19 @@ app.use(cookieParser());
 // Static frontend.
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Connection lifecycle is open (it is how you obtain a session); everything
-// else requires an active connection resolved from the mongoConnId cookie.
-app.use('/api', connectionRoutes);
-app.use('/api/databases', requireConnection, databaseRoutes);
-app.use('/api/databases', requireConnection, collectionRoutes);
-app.use('/api/databases', requireConnection, documentRoutes);
-app.use('/api/databases', requireConnection, indexRoutes);
-app.use('/api/users', requireConnection, userRoutes);
-app.use('/api/stats', requireConnection, statsRoutes);
+// Auth endpoints are public — this is how a session is obtained.
+app.use('/api/auth', authRoutes);
+
+// Everything else requires a valid encrypted-JWT session. Connection routes
+// then establish the mongoConnId session; the data routes additionally require
+// an active connection resolved from the mongoConnId cookie.
+app.use('/api', auth.requireAuth, connectionRoutes);
+app.use('/api/databases', auth.requireAuth, requireConnection, databaseRoutes);
+app.use('/api/databases', auth.requireAuth, requireConnection, collectionRoutes);
+app.use('/api/databases', auth.requireAuth, requireConnection, documentRoutes);
+app.use('/api/databases', auth.requireAuth, requireConnection, indexRoutes);
+app.use('/api/users', auth.requireAuth, requireConnection, userRoutes);
+app.use('/api/stats', auth.requireAuth, requireConnection, statsRoutes);
 
 // 404 for unknown API routes (after all route handlers, before the error
 // handler so unmatched paths get a clean JSON 404).

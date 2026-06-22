@@ -1,6 +1,10 @@
 /* Tiny fetch wrapper used by app.js. All endpoints return JSON; errors are
  * normalized into thrown Error objects carrying the server's message. */
 const Api = (() => {
+  // Invoked when a request fails because the session is missing/expired, so the
+  // UI can drop back to the login gate.
+  let unauthorizedHandler = null;
+
   async function request(method, url, body) {
     const opts = { method, headers: {} };
     if (body !== undefined) {
@@ -21,7 +25,13 @@ const Api = (() => {
       const msg = data && data.error ? data.error : `Request failed (${res.status})`;
       const err = new Error(msg);
       err.status = res.status;
+      err.code = data && data.code;
       err.data = data;
+      // Only auth-session failures trigger the gate — not "not connected" (which
+      // is also a 401 but carries no AUTH_* code).
+      if (res.status === 401 && (err.code === 'AUTH_REQUIRED' || err.code === 'AUTH_INVALID') && unauthorizedHandler) {
+        unauthorizedHandler();
+      }
       throw err;
     }
     return data;
@@ -39,5 +49,8 @@ const Api = (() => {
     put: (url, body) => request('PUT', url, body),
     del: (url, body) => request('DELETE', url, body),
     path,
+    onUnauthorized: (fn) => {
+      unauthorizedHandler = fn;
+    },
   };
 })();

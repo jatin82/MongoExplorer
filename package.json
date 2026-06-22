@@ -12,7 +12,9 @@
   "license": "ISC",
   "dependencies": {
     "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "jose": "^5.9.6",
     "mongodb": "^6.12.0"
   }
 }

@@ -9,7 +9,23 @@
 </head>
 
 <body>
-  <header class="topbar">
+  <!-- Auth gate: blocks the app until a valid access key is provided. Both the
+       gate and the app shell start hidden; app.js reveals the correct one once
+       the session status is known, avoiding a flash of the wrong screen. -->
+  <div id="authGate" class="auth-gate hidden">
+    <form id="authForm" class="auth-card" autocomplete="off" novalidate>
+      <div class="auth-logo">MongoExplorer</div>
+      <p class="auth-tagline">Enter your access key to continue</p>
+      <div class="auth-field">
+        <input id="authKey" type="password" placeholder="Access key" autocomplete="off" spellcheck="false" />
+        <label class="show-toggle"><input type="checkbox" id="showAuthKey" /> show</label>
+      </div>
+      <button id="authSubmit" type="submit">Unlock</button>
+      <div id="authError" class="auth-error" role="alert"></div>
+    </form>
+  </div>
+
+  <header class="topbar hidden" id="topbar">
     <div class="brand">MongoExplorer</div>
     <div class="connbar">
       <input id="connString" type="password" placeholder="mongodb://localhost:27017" autocomplete="off"
@@ -18,10 +34,11 @@
       <button id="connectBtn">Connect</button>
       <button id="disconnectBtn" class="hidden secondary">Disconnect</button>
       <span id="connStatus" class="status disconnected">Disconnected</span>
+      <button id="signOutBtn" class="secondary" title="Sign out">Sign out</button>
     </div>
   </header>
 
-  <main class="layout">
+  <main class="layout hidden" id="appMain">
     <aside class="sidebar">
       <div class="sidebar-header">
         <span>Databases</span>

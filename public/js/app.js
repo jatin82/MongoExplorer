@@ -126,6 +126,81 @@ function requireSelection() {
   return true;
 }
 
+/* ---------- Auth ---------- */
+
+function setAuthError(message) {
+  byId('authError').textContent = message || '';
+}
+
+function showGate(message) {
+  byId('topbar').classList.add('hidden');
+  byId('appMain').classList.add('hidden');
+  byId('authGate').classList.remove('hidden');
+  setAuthError(message || '');
+  const key = byId('authKey');
+  if (key) {
+    key.value = '';
+    key.focus();
+  }
+}
+
+function showApp() {
+  byId('authGate').classList.add('hidden');
+  byId('topbar').classList.remove('hidden');
+  byId('appMain').classList.remove('hidden');
+  // Resume the normal connection bootstrap now that we are authenticated.
+  checkStatus();
+}
+
+// Decide which screen to show on load based on whether a valid session exists.
+async function bootstrapAuth() {
+  try {
+    const data = await Api.get('/api/auth/status');
+    if (data.authenticated) showApp();
+    else showGate();
+  } catch {
+    showGate();
+  }
+}
+
+async function submitAuth(e) {
+  if (e) e.preventDefault();
+  const key = byId('authKey').value;
+  if (!key) {
+    setAuthError('Enter your access key.');
+    return;
+  }
+  setBusy(byId('authSubmit'), true);
+  setAuthError('');
+  try {
+    await Api.post('/api/auth/login', { key });
+    toast('Signed in.', 'success');
+    showApp();
+  } catch (err) {
+    setAuthError(err.message || 'Invalid access key.');
+  } finally {
+    setBusy(byId('authSubmit'), false);
+  }
+}
+
+async function signOut() {
+  // Drop the live DB connection first (while still authorized), then end the
+  // session so no credentials linger server-side.
+  try {
+    if (state.connected) await Api.post('/api/disconnect');
+  } catch {
+    /* ignore */
+  }
+  try {
+    await Api.post('/api/auth/logout');
+  } catch {
+    /* ignore */
+  }
+  onDisconnected();
+  showGate();
+  toast('Signed out.', 'info');
+}
+
 /* ---------- Connection ---------- */
 
 async function connect() {
@@ -924,6 +999,17 @@ function switchTab(name) {
 /* ---------- Init ---------- */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Auth gate wiring.
+  byId('authForm').addEventListener('submit', submitAuth);
+  byId('showAuthKey').addEventListener('change', (e) => {
+    byId('authKey').type = e.target.checked ? 'text' : 'password';
+  });
+  byId('signOutBtn').addEventListener('click', signOut);
+  Api.onUnauthorized(() => {
+    if (state.connected) onDisconnected();
+    showGate('Your session expired. Please sign in again.');
+  });
+
   byId('connectBtn').addEventListener('click', connect);
   byId('disconnectBtn').addEventListener('click', disconnect);
   byId('connString').addEventListener('keydown', (e) => {
@@ -976,5 +1062,5 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape' && !byId('modal').classList.contains('hidden')) closeModal();
   });
 
-  checkStatus();
+  bootstrapAuth();
 });
