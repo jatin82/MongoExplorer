@@ -18,16 +18,19 @@
 #   CONTAINER_NAME  Running container name        (default: mongo-explorer)
 #   HOST_PORT       Published host port           (default: 3000)
 #   APP_PORT        In-container app port         (default: 3000)
-#   BIND_ADDRESS    Host interface to publish on  (default: 127.0.0.1)
+#   BIND_ADDRESS    Host interface to publish on  (default: 0.0.0.0)
 #   RESTART_POLICY  Docker restart policy         (default: unless-stopped)
 #   ENV_FILE        Env file passed to container  (default: .env)
 #   GIT_PULL        Pull latest code on deploy    (default: true)
 #   GIT_REMOTE      Git remote to pull from       (default: origin)
 #   GIT_BRANCH      Git branch to pull            (default: current branch)
 #
-# SECURITY: The port is published only on 127.0.0.1 by default because this
-# service brokers raw MongoDB credentials and must not be exposed on the
-# network. Set BIND_ADDRESS=0.0.0.0 only behind a trusted reverse proxy + TLS.
+# SECURITY: The port is published on 0.0.0.0 so the app is reachable from
+# outside (e.g. via your droplet's public IP at http://<DROPLET_IP>:HOST_PORT).
+# This service brokers raw MongoDB credentials, so when exposed publicly you
+# SHOULD: use a strong APP_ACCESS_KEY, put it behind HTTPS (reverse proxy) with
+# COOKIE_SECURE=true + TRUST_PROXY=true, and/or restrict the port with a
+# firewall. To keep it local-only again, set BIND_ADDRESS=127.0.0.1.
 
 set -euo pipefail
 
@@ -37,7 +40,7 @@ IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
 CONTAINER_NAME="${CONTAINER_NAME:-mongo-explorer}"
 HOST_PORT="${HOST_PORT:-3000}"
 APP_PORT="${APP_PORT:-3000}"
-BIND_ADDRESS="${BIND_ADDRESS:-127.0.0.1}"
+BIND_ADDRESS="${BIND_ADDRESS:-0.0.0.0}"
 RESTART_POLICY="${RESTART_POLICY:-unless-stopped}"
 ENV_FILE="${ENV_FILE:-.env}"
 GIT_PULL="${GIT_PULL:-true}"
@@ -124,7 +127,19 @@ run_container() {
     -e "HOST=0.0.0.0" \
     "${IMAGE}" >/dev/null
   info "Container started."
-  info "MongoExplorer is available at http://${BIND_ADDRESS}:${HOST_PORT}"
+  if [[ "${BIND_ADDRESS}" == "0.0.0.0" ]]; then
+    # Try to show the public IP so the printed URL is directly usable.
+    local public_ip
+    public_ip="$(curl -fsS --max-time 3 https://api.ipify.org 2>/dev/null || true)"
+    if [[ -n "${public_ip}" ]]; then
+      info "MongoExplorer is available at http://${public_ip}:${HOST_PORT}"
+    else
+      info "MongoExplorer is available at http://<DROPLET_IP>:${HOST_PORT}"
+    fi
+    info "Reachable externally. Ensure your firewall allows TCP ${HOST_PORT} and use a strong APP_ACCESS_KEY."
+  else
+    info "MongoExplorer is available at http://${BIND_ADDRESS}:${HOST_PORT}"
+  fi
 }
 
 stop_container() {
