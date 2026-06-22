@@ -1,0 +1,18 @@
+{
+  "name": "mongo-explorer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web app to connect to any MongoDB instance and read, write, create and administer databases, collections, indexes and users.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "mongodb": "^6.12.0"
+  }
+}

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MongoExplorer</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">MongoExplorer</div>
+    <div class="connbar">
+      <input id="connString" type="password" placeholder="mongodb://localhost:27017" autocomplete="off"
+        spellcheck="false" />
+      <label class="show-toggle"><input type="checkbox" id="showConn" /> show</label>
+      <button id="connectBtn">Connect</button>
+      <button id="disconnectBtn" class="hidden secondary">Disconnect</button>
+      <span id="connStatus" class="status disconnected">Disconnected</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span>Databases</span>
+        <div class="sidebar-actions">
+          <button id="newDbBtn" title="New database" disabled>+</button>
+          <button id="refreshDbBtn" title="Refresh" disabled>&#x21bb;</button>
+        </div>
+      </div>
+      <ul id="dbTree" class="db-tree">
+        <li class="empty-hint">Connect to view databases.</li>
+      </ul>
+    </aside>
+
+    <section class="content">
+      <div class="selection-bar">
+        <span id="selectionLabel">No collection selected</span>
+      </div>
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="documents">Documents</button>
+        <button class="tab" data-tab="indexes">Indexes</button>
+        <button class="tab" data-tab="users">Users &amp; Roles</button>
+        <button class="tab" data-tab="stats">Stats</button>
+      </nav>
+
+      <!-- Documents -->
+      <div class="tab-panel active" id="tab-documents">
+        <div class="query-bar">
+          <div class="field">
+            <label for="qFilter">Filter (EJSON)</label>
+            <textarea id="qFilter" rows="2" placeholder="{}"></textarea>
+          </div>
+          <div class="field">
+            <label for="qProjection">Projection</label>
+            <textarea id="qProjection" rows="2" placeholder="{}"></textarea>
+          </div>
+          <div class="field">
+            <label for="qSort">Sort</label>
+            <textarea id="qSort" rows="2" placeholder='{ "_id": -1 }'></textarea>
+          </div>
+          <div class="field tiny">
+            <label for="qLimit">Limit</label>
+            <input id="qLimit" type="number" min="1" max="1000" value="50" />
+          </div>
+          <div class="field tiny">
+            <label for="qSkip">Skip</label>
+            <input id="qSkip" type="number" min="0" value="0" />
+          </div>
+          <div class="query-actions">
+            <button id="runQueryBtn">Run Query</button>
+            <button id="insertDocBtn" class="secondary">Insert</button>
+            <button id="downloadCsvBtn" class="secondary">Download CSV</button>
+          </div>
+        </div>
+        <div class="results-meta">
+          <span id="resultsCount"></span>
+          <div class="pager">
+            <button id="prevPageBtn" disabled>&#8249; Prev</button>
+            <span id="pageInfo"></span>
+            <button id="nextPageBtn" disabled>Next &#8250;</button>
+          </div>
+        </div>
+        <div class="bulk-bar">
+          <label class="bulk-check"><input type="checkbox" id="selectAllDocs" /> Select page</label>
+          <span id="selectionInfo" class="selection-info"></span>
+          <div class="bulk-actions">
+            <button id="deleteSelectedBtn" class="danger small" disabled>Delete Selected</button>
+            <button id="deleteMatchingBtn" class="danger small">Delete Matching Filter</button>
+          </div>
+        </div>
+        <div id="docList" class="doc-list">
+          <p class="empty-hint">Select a collection to browse documents.</p>
+        </div>
+      </div>
+
+      <!-- Indexes -->
+      <div class="tab-panel" id="tab-indexes">
+        <div class="panel-actions">
+          <button id="refreshIndexesBtn">Refresh</button>
+          <button id="newIndexBtn" class="secondary">Create Index</button>
+        </div>
+        <div id="indexContainer">
+          <p class="empty-hint">Select a collection to manage indexes.</p>
+        </div>
+      </div>
+
+      <!-- Users & Roles -->
+      <div class="tab-panel" id="tab-users">
+        <div class="panel-actions">
+          <label class="inline-field">Database
+            <input id="userDbInput" placeholder="admin" />
+          </label>
+          <button id="loadUsersBtn">Load Users</button>
+          <button id="newUserBtn" class="secondary">Create User</button>
+        </div>
+        <div id="userContainer">
+          <p class="empty-hint">Enter a database and load its users.</p>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="tab-panel" id="tab-stats">
+        <div class="panel-actions">
+          <button id="loadDbStatsBtn">Database Stats</button>
+          <button id="loadServerStatusBtn">Server Status</button>
+          <button id="loadOverviewBtn">Databases Overview</button>
+        </div>
+        <pre id="statsOutput" class="stats-output">No stats loaded.</pre>
+      </div>
+    </section>
+  </main>
+
+  <!-- Generic modal for forms -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Edit</h3>
+        <button id="modalClose" class="icon-btn">&#x2715;</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+      <div class="modal-footer">
+        <span id="modalError" class="modal-error"></span>
+        <button id="modalCancel" class="secondary">Cancel</button>
+        <button id="modalSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+
+</html>
