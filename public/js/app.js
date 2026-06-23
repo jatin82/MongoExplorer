@@ -487,23 +487,23 @@ async function runQuery(reset) {
   }
 }
 
-// Direct lookup by _id: bypasses the filter box and asks the server to match
-// the entered value against the _id types it could be (ObjectId, string,
-// number). Results show as a single page with paging disabled.
-async function findById() {
+// Search a single value across every indexed field: bypasses the filter box and
+// asks the server to match the value (as text, number, boolean or ObjectId)
+// against all indexed fields. Results show as a single page with paging disabled.
+async function searchIndexed() {
   if (!requireSelection()) return;
-  const id = byId('idSearchInput').value.trim();
-  if (!id) {
-    toast('Enter an _id to search.', 'info');
+  const value = byId('indexSearchInput').value.trim();
+  if (!value) {
+    toast('Enter a value to search.', 'info');
     return;
   }
   state.selectedIds.clear();
   const list = byId('docList');
   list.innerHTML = '';
   list.append(elem('p', { class: 'spinner', text: 'Searching…' }));
-  setBusy(byId('idSearchBtn'), true);
+  setBusy(byId('indexSearchBtn'), true);
   try {
-    const data = await Api.post(docPath('documents', 'find-by-id'), { id });
+    const data = await Api.post(docPath('documents', 'search-indexed'), { value });
     state.documents = data.documents || [];
     state.total = data.total || 0;
     renderDocuments(state.documents);
@@ -511,7 +511,10 @@ async function findById() {
     byId('pageInfo').textContent = state.total ? `1\u2013${state.total} of ${state.total}` : '';
     byId('prevPageBtn').disabled = true;
     byId('nextPageBtn').disabled = true;
-    if (!state.total) toast('No document found with that _id.', 'info');
+    if (!state.total) {
+      const fields = (data.fields || []).join(', ');
+      toast(fields ? `No match in indexed fields: ${fields}` : 'This collection has no indexed fields to search.', 'info');
+    }
   } catch (err) {
     list.innerHTML = '';
     list.append(elem('p', { class: 'empty-hint', text: err.message }));
@@ -519,13 +522,13 @@ async function findById() {
     byId('pageInfo').textContent = '';
     toast(err.message, 'error');
   } finally {
-    setBusy(byId('idSearchBtn'), false);
+    setBusy(byId('indexSearchBtn'), false);
   }
 }
 
-// Clear the id search box and return to the normal filtered query view.
-function clearIdSearch() {
-  byId('idSearchInput').value = '';
+// Clear the search box and return to the normal filtered query view.
+function clearIndexSearch() {
+  byId('indexSearchInput').value = '';
   runQuery(true);
 }
 
@@ -1064,10 +1067,10 @@ document.addEventListener('DOMContentLoaded', () => {
   byId('refreshDbBtn').addEventListener('click', loadDatabases);
 
   byId('runQueryBtn').addEventListener('click', () => runQuery(true));
-  byId('idSearchBtn').addEventListener('click', findById);
-  byId('idSearchClearBtn').addEventListener('click', clearIdSearch);
-  byId('idSearchInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') findById();
+  byId('indexSearchBtn').addEventListener('click', searchIndexed);
+  byId('indexSearchClearBtn').addEventListener('click', clearIndexSearch);
+  byId('indexSearchInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') searchIndexed();
   });
   byId('insertDocBtn').addEventListener('click', openInsertDocument);
   byId('downloadCsvBtn').addEventListener('click', downloadCsv);

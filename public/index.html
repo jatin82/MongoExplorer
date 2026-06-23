@@ -66,11 +66,12 @@
 
       <!-- Documents -->
       <div class="tab-panel active" id="tab-documents">
-        <div class="id-search-bar">
-          <input id="idSearchInput" type="text" placeholder="Find document by _id (paste an ObjectId or value)"
+        <div class="index-search-bar">
+          <input id="indexSearchInput" type="text"
+            placeholder="Search all indexed fields (_id, email, …) — fast lookup by value"
             spellcheck="false" autocomplete="off" />
-          <button id="idSearchBtn">Find by ID</button>
-          <button id="idSearchClearBtn" class="secondary">Clear</button>
+          <button id="indexSearchBtn">Search</button>
+          <button id="indexSearchClearBtn" class="secondary">Clear</button>
         </div>
         <div class="query-bar">
           <div class="field">

@@ -100,41 +100,77 @@ router.post(
   })
 );
 
-// POST /:db/collections/:coll/documents/find-by-id — look up documents by _id.
-// Accepts a raw id string and matches it against the _id types it could
-// represent (ObjectId, plain string, integer) so callers don't need to know how
-// _id is stored. Body: { id }.
+// Build candidate typed values for a raw search string so a value entered as
+// text can also match numeric, boolean or ObjectId fields. The raw string
+// itself is matched separately via a case-insensitive regex, so it is not
+// repeated here.
+function typedValueCandidates(raw) {
+  const out = [];
+  if (/^[0-9a-fA-F]{24}$/.test(raw)) {
+    try {
+      out.push(new ObjectId(raw));
+    } catch {
+      /* not a real ObjectId — the other candidates still apply */
+    }
+  }
+  if (/^-?\d+$/.test(raw) && Number.isSafeInteger(Number(raw))) out.push(Number(raw));
+  if (raw === 'true') out.push(true);
+  else if (raw === 'false') out.push(false);
+  return out;
+}
+
+// Escape user input so it is treated as a literal inside a $regex.
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Collect the field names covered by a collection's indexes, including the
+// underlying fields of a text index (stored under `weights`). The internal text
+// index keys (_fts/_ftsx) are skipped.
+function indexedFieldNames(indexes) {
+  const fields = new Set();
+  for (const ix of indexes) {
+    for (const key of Object.keys(ix.key || {})) {
+      if (key === '_fts' || key === '_ftsx') continue;
+      fields.add(key);
+    }
+    if (ix.weights) {
+      for (const key of Object.keys(ix.weights)) fields.add(key);
+    }
+  }
+  return [...fields];
+}
+
+// POST /:db/collections/:coll/documents/search-indexed — search one value across
+// every indexed field. Each indexed field is matched both by a case-insensitive
+// substring regex and by typed equality (number/boolean/ObjectId) so a value
+// typed as text still matches non-string fields. Limiting the search to indexed
+// fields keeps it fast. Body: { value }.
 router.post(
-  '/:db/collections/:coll/documents/find-by-id',
+  '/:db/collections/:coll/documents/search-indexed',
   asyncHandler(async (req, res) => {
     const { db, coll } = req.params;
-    const raw = (req.body || {}).id;
-    const id = raw === undefined || raw === null ? '' : String(raw).trim();
-    if (id === '') throw badRequest('An "id" value is required.');
+    const raw = (req.body || {}).value;
+    const value = raw === undefined || raw === null ? '' : String(raw).trim();
+    if (value === '') throw badRequest('A search "value" is required.');
 
-    // Build candidate _id values: the raw string always matches a string _id; a
-    // 24-char hex string also matches an ObjectId _id; an integer string also
-    // matches a numeric _id. Matching with $in lets one query cover every case.
-    const candidates = [id];
-    if (/^[0-9a-fA-F]{24}$/.test(id)) {
-      try {
-        candidates.push(new ObjectId(id));
-      } catch {
-        /* not a real ObjectId after all — the other candidates still apply */
-      }
-    }
-    if (/^-?\d+$/.test(id) && Number.isSafeInteger(Number(id))) {
-      candidates.push(Number(id));
+    const collection = req.mongoClient.db(db).collection(coll);
+    const fields = indexedFieldNames(await collection.indexes());
+    if (fields.length === 0) {
+      return res.json({ documents: [], total: 0, fields: [] });
     }
 
-    const documents = await req.mongoClient
-      .db(db)
-      .collection(coll)
-      .find({ _id: { $in: candidates } })
-      .limit(50)
-      .toArray();
+    const regex = { $regex: escapeRegex(value), $options: 'i' };
+    const typed = typedValueCandidates(value);
+    const or = [];
+    for (const field of fields) {
+      or.push({ [field]: regex });
+      for (const candidate of typed) or.push({ [field]: candidate });
+    }
 
-    res.json({ documents: serialize(documents), total: documents.length });
+    const documents = await collection.find({ $or: or }).limit(50).toArray();
+
+    res.json({ documents: serialize(documents), total: documents.length, fields });
   })
 );
 

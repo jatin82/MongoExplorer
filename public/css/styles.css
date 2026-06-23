@@ -321,15 +321,15 @@ body {
   flex-direction: column;
 }
 
-/* Find-by-id search bar */
-.id-search-bar {
+/* Find-by-index search bar */
+.index-search-bar {
   display: flex;
   gap: 8px;
   align-items: center;
   margin-bottom: 12px;
 }
 
-.id-search-bar input {
+.index-search-bar input {
   flex: 1;
   font-family: var(--mono);
 }
