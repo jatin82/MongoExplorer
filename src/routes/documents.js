@@ -1,4 +1,5 @@
 const express = require('express');
+const { ObjectId } = require('mongodb');
 const { asyncHandler } = require('../utils/asyncHandler');
 const { assertDbName, assertCollectionName } = require('../utils/validate');
 const { parse, serialize, stringify } = require('../utils/ejson');
@@ -96,6 +97,44 @@ router.post(
     const total = await collection.countDocuments(filter);
 
     res.json({ documents: serialize(documents), total, limit, skip });
+  })
+);
+
+// POST /:db/collections/:coll/documents/find-by-id — look up documents by _id.
+// Accepts a raw id string and matches it against the _id types it could
+// represent (ObjectId, plain string, integer) so callers don't need to know how
+// _id is stored. Body: { id }.
+router.post(
+  '/:db/collections/:coll/documents/find-by-id',
+  asyncHandler(async (req, res) => {
+    const { db, coll } = req.params;
+    const raw = (req.body || {}).id;
+    const id = raw === undefined || raw === null ? '' : String(raw).trim();
+    if (id === '') throw badRequest('An "id" value is required.');
+
+    // Build candidate _id values: the raw string always matches a string _id; a
+    // 24-char hex string also matches an ObjectId _id; an integer string also
+    // matches a numeric _id. Matching with $in lets one query cover every case.
+    const candidates = [id];
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      try {
+        candidates.push(new ObjectId(id));
+      } catch {
+        /* not a real ObjectId after all — the other candidates still apply */
+      }
+    }
+    if (/^-?\d+$/.test(id) && Number.isSafeInteger(Number(id))) {
+      candidates.push(Number(id));
+    }
+
+    const documents = await req.mongoClient
+      .db(db)
+      .collection(coll)
+      .find({ _id: { $in: candidates } })
+      .limit(50)
+      .toArray();
+
+    res.json({ documents: serialize(documents), total: documents.length });
   })
 );
 

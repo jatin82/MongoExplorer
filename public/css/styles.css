@@ -321,6 +321,19 @@ body {
   flex-direction: column;
 }
 
+/* Find-by-id search bar */
+.id-search-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.id-search-bar input {
+  flex: 1;
+  font-family: var(--mono);
+}
+
 /* Query bar */
 .query-bar {
   display: flex;
